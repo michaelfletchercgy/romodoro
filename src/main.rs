@@ -20,9 +20,9 @@ fn main() {
     let matches = App::new("Romodoro")
                         .version("0.1")
                         .author("Michael Fletcher <m.fletcher@theplanet.ca>")
-                        .arg(Arg::with_name("goal")
-                               .long("goal")
-                               .help("Display the goal you are trying to achieve.  Helps to keep you focused.")
+                        .arg(Arg::with_name("task")
+                               .long("task")
+                               .help("Display the specified task on the timer.  This will help keep you focused.")
                                .takes_value(true))
                         .get_matches();
 
