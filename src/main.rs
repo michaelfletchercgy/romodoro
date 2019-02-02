@@ -44,16 +44,16 @@ fn main() {
     
     println!("{}", termion::clear::All);
     
-    // Print Goal
-    let goal = matches.value_of("goal");
+    // Print Task
+    let task = matches.value_of("task");
 
-    if goal.is_some() {
-        let goal_str = &goal.unwrap();
+    if task.is_some() {
+        let task_str = &task.unwrap();
         println!("{}{}{}{}{}{}", 
             termion::style::Bold,
             termion::color::Fg(termion::color::LightRed),
-            termion::cursor::Goto((width / 2) - (goal_str.len() / 2) as u16, height / 2), 
-            &goal.unwrap(),
+            termion::cursor::Goto((width / 2) - (task_str.len() / 2) as u16, height / 2), 
+            &task.unwrap(),
             termion::color::Fg(termion::color::Reset),
             termion::style::Reset);
     }
@@ -86,11 +86,14 @@ fn main() {
         termion::color::Fg(termion::color::LightBlue),
         end.format("%l:%M")
         );
+    
     println!("{}{}", 
         termion::cursor::Goto(width - 9 - 4 as u16, 2),
         end_str);
     
     println!("{}", termion::cursor::Hide);
+
+    let total_seconds = (end - start).num_seconds();
 
     // Update the screen.
     while Local::now() < end && keep_running.load(Ordering::SeqCst) {
@@ -98,18 +101,35 @@ fn main() {
 
         if remaining.num_seconds() > 60 { 
             println!("{}{}Remaining: {}{}m", 
-                termion::cursor::Goto(4, height - 1),
+                termion::cursor::Goto(4, height - 3),
                 termion::color::Fg(termion::color::Reset),
                 termion::color::Fg(termion::color::LightBlue),
                 remaining.num_minutes() + 1);;
         } else {
             println!("{}{}Remaining: {}{}s", 
-                termion::cursor::Goto(1, height - 3),
+                termion::cursor::Goto(4, height - 3),
                 termion::color::Fg(termion::color::Reset),
                 termion::color::Fg(termion::color::LightBlue),
                 remaining.num_seconds());;
         }
         
+        let percent = 1.0 - (remaining.num_seconds() as f64 / total_seconds as f64);
+        let progress_max = width - 4 - 4;
+        let progress_current = (percent * f64::from(progress_max) as u16;
+
+        print!("{}", termion::color::Bg(termion::color::Blue));
+        for c in 4..(4+progress_current) {
+            print!("{} ", termion::cursor::Goto(c, height - 1))
+        }
+        print!("{}", termion::color::Bg(termion::color::Reset));
+
+        print!("{}", termion::color::Bg(termion::color::White));
+        for c in (4 + progress_current)..(progress_max+4) {
+            print!("{} ", termion::cursor::Goto(c, height - 1))
+        }
+
+        println!("{}", termion::color::Bg(termion::color::Reset));
+
         if remaining.num_seconds() > 120 { 
             park_timeout(std::time::Duration::from_secs(60));
         } else {
