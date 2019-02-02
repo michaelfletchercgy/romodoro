@@ -1,8 +1,11 @@
 [package]
 name = "romodoro"
-version = "0.1.0"
-authors = ["michaelfletcher"]
+version = "0.2.0"
+authors = ["Michael Fletcher <m.fletcher@theplanet.ca>"]
 edition = "2018"
+description = "Romodoro is a terminal Pomodoro timer."
+license = "MIT"
+repository = "https://github.com/michaelfletchercgy/romodoro"
 
 [dependencies]
 chrono = "0.4.6"
