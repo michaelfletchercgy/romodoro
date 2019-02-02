@@ -18,7 +18,7 @@ use std::thread::park_timeout;
 
 fn main() {
     let matches = App::new("Romodoro")
-                        .version("0.2")
+                        .version("0.3")
                         .about("Romodoro is a terminal Pomodoro timer.")
                         .author("Michael Fletcher <m.fletcher@theplanet.ca>")
                         .arg(Arg::with_name("task")

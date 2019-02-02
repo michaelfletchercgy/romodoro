@@ -2,10 +2,13 @@
 
 Romodoro is a terminal Pomodoro timer.
 
-## Installation
+## Quick Start
 
- * Install Rust (https://www.rust-lang.org/learn/get-started).
- * cargo install romodoro
+ * Install Rust (https://www.rust-lang.org/tools/install).
+ * ```cargo install romodoro```
+ * ```$ romodoro```
+
+![screenshot](./screenshot.png)
 
 ## Acknowledgements
 
