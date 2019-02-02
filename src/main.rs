@@ -115,7 +115,7 @@ fn main() {
         
         let percent = 1.0 - (remaining.num_seconds() as f64 / total_seconds as f64);
         let progress_max = width - 4 - 4;
-        let progress_current = (percent * f64::from(progress_max) as u16;
+        let progress_current = (percent * f64::from(progress_max)) as u16;
 
         print!("{}", termion::color::Bg(termion::color::Blue));
         for c in 4..(4+progress_current) {
