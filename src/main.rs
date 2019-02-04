@@ -41,73 +41,83 @@ fn main() {
     let duration = Duration::seconds(60 * 25);
     let end = start + duration;    
 
-    let (width, height) = termion::terminal_size().unwrap_or((80, 24));
-    
-    println!("{}", termion::clear::All);
-    
-    // Print Task
     let task = matches.value_of("task");
-
-    if task.is_some() {
-        let task_str = &task.unwrap();
-        println!("{}{}{}{}{}{}", 
-            termion::style::Bold,
-            termion::color::Fg(termion::color::LightRed),
-            termion::cursor::Goto((width / 2) - (task_str.len() / 2) as u16, height / 2), 
-            &task.unwrap(),
-            termion::color::Fg(termion::color::Reset),
-            termion::style::Reset);
-    }
-    
-    // Print Start
-    println!("{}{}Start: {}{}", 
-        termion::cursor::Goto(4, 2),
-        termion::color::Fg(termion::color::Reset),
-        termion::color::Fg(termion::color::LightBlue),
-        start.format("%l:%M"),
-        );
-
-    // Print Duration
-    let duration_str_for_size = format!("Duration: {}m", duration.num_minutes());
-    let duration_str = format!(
-        "{}Duration: {}{}m",
-        termion::color::Fg(termion::color::Reset),
-        termion::color::Fg(termion::color::LightBlue),
-        duration.num_minutes()
-        );
-        
-    println!("{}{}", 
-        termion::cursor::Goto((width / 2) - (duration_str_for_size.len() / 2) as u16, 2),
-        duration_str);
-
-    // Print End
-    let end_str = format!(
-        "{}End: {}{}",
-        termion::color::Fg(termion::color::Reset),
-        termion::color::Fg(termion::color::LightBlue),
-        end.format("%l:%M")
-        );
-    
-    println!("{}{}", 
-        termion::cursor::Goto(width - 9 - 4 as u16, 2),
-        end_str);
-    
-    println!("{}", termion::cursor::Hide);
-
     let total_seconds = (end - start).num_seconds();
+
+    let mut last_width = 0;
+    let mut last_height = 0;
 
     // Update the screen.
     while Local::now() < end && keep_running.load(Ordering::SeqCst) {
+        let (width, height) = termion::terminal_size().unwrap_or((80, 24));
+    
+        if width != last_width || height != last_height {
+            last_width = width;
+            last_height = height;
+
+            println!("{}", termion::clear::All);
+            
+            // Print Task
+            if task.is_some() {
+                let task_str = &task.unwrap();
+                println!("{}{}{}{}{}{}", 
+                    termion::style::Bold,
+                    termion::color::Fg(termion::color::LightRed),
+                    termion::cursor::Goto((width / 2) - (task_str.len() / 2) as u16, height / 2), 
+                    &task.unwrap(),
+                    termion::color::Fg(termion::color::Reset),
+                    termion::style::Reset);
+            }
+            
+            // Print Start
+            println!("{}{}Start: {}{}", 
+                termion::cursor::Goto(4, 2),
+                termion::color::Fg(termion::color::Reset),
+                termion::color::Fg(termion::color::LightBlue),
+                start.format("%l:%M"),
+                );
+
+            // Print Duration
+            let duration_str_for_size = format!("Duration: {}m", duration.num_minutes());
+            let duration_str = format!(
+                "{}Duration: {}{}m",
+                termion::color::Fg(termion::color::Reset),
+                termion::color::Fg(termion::color::LightBlue),
+                duration.num_minutes()
+                );
+                
+            println!("{}{}", 
+                termion::cursor::Goto((width / 2) - (duration_str_for_size.len() / 2) as u16, 2),
+                duration_str);
+
+            // Print End
+            let end_str = format!(
+                "{}End: {}{}",
+                termion::color::Fg(termion::color::Reset),
+                termion::color::Fg(termion::color::LightBlue),
+                end.format("%l:%M")
+                );
+            
+            println!("{}{}", 
+                termion::cursor::Goto(width - 9 - 4 as u16, 2),
+                end_str);
+            
+            println!("{}", termion::cursor::Hide);
+        }
+
         let remaining = end - Local::now();
 
         if remaining.num_seconds() > 60 { 
-            println!("{}{}Remaining: {}{}m", 
+            // two extra spaces to cover when it changes from 10m to 9m.  Without the extra space
+            // it shows "9mm"
+            println!("{}{}Remaining: {}{}m  ", 
                 termion::cursor::Goto(4, height - 3),
                 termion::color::Fg(termion::color::Reset),
                 termion::color::Fg(termion::color::LightBlue),
                 remaining.num_minutes() + 1);;
         } else {
-            println!("{}{}Remaining: {}{}s", 
+            // See spaces comment above.
+            println!("{}{}Remaining: {}{}s  ", 
                 termion::cursor::Goto(4, height - 3),
                 termion::color::Fg(termion::color::Reset),
                 termion::color::Fg(termion::color::LightBlue),
@@ -132,7 +142,8 @@ fn main() {
         println!("{}", termion::color::Bg(termion::color::Reset));
 
         if remaining.num_seconds() > 120 { 
-            park_timeout(std::time::Duration::from_secs(60));
+            // Update less frequently if we have a ways to go.
+            park_timeout(std::time::Duration::from_secs(10));
         } else {
             park_timeout(std::time::Duration::from_secs(1));            
         }
