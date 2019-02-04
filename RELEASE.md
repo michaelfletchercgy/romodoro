@@ -1,5 +1,8 @@
 # Release
 
+## Update Dependencies
+ * ```cargo update```
+
 ## Automated Testing
 
  * ```cargo test```
@@ -17,3 +20,7 @@
   * It should show the task.
 
 ## Commit & Push
+
+ * Commit changes
+ * Push changes to master
+ * ```cargo publish```
