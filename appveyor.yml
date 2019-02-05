@@ -21,3 +21,6 @@ build: false
 
 test_script:
   - cargo test --verbose %cargoflags%
+
+artifacts:
+  - path: target/release/romodoro.exe
