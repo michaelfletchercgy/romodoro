@@ -3,6 +3,7 @@ extern crate clap;
 extern crate ctrlc;
 extern crate termion;
 
+use chrono::DateTime;
 use chrono::Duration;
 use chrono::Local;
 
@@ -42,7 +43,6 @@ fn main() {
     let end = start + duration;    
 
     let task = matches.value_of("task");
-    let total_seconds = (end - start).num_seconds();
 
     let mut last_width = 0;
     let mut last_height = 0;
@@ -50,96 +50,17 @@ fn main() {
     // Update the screen.
     while Local::now() < end && keep_running.load(Ordering::SeqCst) {
         let (width, height) = termion::terminal_size().unwrap_or((80, 24));
-    
+
+        let remaining = end - Local::now();
+
         if width != last_width || height != last_height {
             last_width = width;
             last_height = height;
 
-            println!("{}", termion::clear::All);
-            
-            // Print Task
-            if task.is_some() {
-                let task_str = &task.unwrap();
-                println!("{}{}{}{}{}{}", 
-                    termion::style::Bold,
-                    termion::color::Fg(termion::color::LightRed),
-                    termion::cursor::Goto((width / 2) - (task_str.len() / 2) as u16, height / 2), 
-                    &task.unwrap(),
-                    termion::color::Fg(termion::color::Reset),
-                    termion::style::Reset);
-            }
-            
-            // Print Start
-            println!("{}{}Start: {}{}", 
-                termion::cursor::Goto(4, 2),
-                termion::color::Fg(termion::color::Reset),
-                termion::color::Fg(termion::color::LightBlue),
-                start.format("%l:%M"),
-                );
-
-            // Print Duration
-            let duration_str_for_size = format!("Duration: {}m", duration.num_minutes());
-            let duration_str = format!(
-                "{}Duration: {}{}m",
-                termion::color::Fg(termion::color::Reset),
-                termion::color::Fg(termion::color::LightBlue),
-                duration.num_minutes()
-                );
-                
-            println!("{}{}", 
-                termion::cursor::Goto((width / 2) - (duration_str_for_size.len() / 2) as u16, 2),
-                duration_str);
-
-            // Print End
-            let end_str = format!(
-                "{}End: {}{}",
-                termion::color::Fg(termion::color::Reset),
-                termion::color::Fg(termion::color::LightBlue),
-                end.format("%l:%M")
-                );
-            
-            println!("{}{}", 
-                termion::cursor::Goto(width - 9 - 4 as u16, 2),
-                end_str);
-            
-            println!("{}", termion::cursor::Hide);
+            draw_all(start, end, duration, task, width, height);
         }
 
-        let remaining = end - Local::now();
-
-        if remaining.num_seconds() > 60 { 
-            // two extra spaces to cover when it changes from 10m to 9m.  Without the extra space
-            // it shows "9mm"
-            println!("{}{}Remaining: {}{}m  ", 
-                termion::cursor::Goto(4, height - 3),
-                termion::color::Fg(termion::color::Reset),
-                termion::color::Fg(termion::color::LightBlue),
-                remaining.num_minutes() + 1);;
-        } else {
-            // See spaces comment above.
-            println!("{}{}Remaining: {}{}s  ", 
-                termion::cursor::Goto(4, height - 3),
-                termion::color::Fg(termion::color::Reset),
-                termion::color::Fg(termion::color::LightBlue),
-                remaining.num_seconds());;
-        }
-        
-        let percent = 1.0 - (remaining.num_seconds() as f64 / total_seconds as f64);
-        let progress_max = width - 4 - 4;
-        let progress_current = (percent * f64::from(progress_max)) as u16;
-
-        print!("{}", termion::color::Bg(termion::color::Blue));
-        for c in 4..(4+progress_current) {
-            print!("{} ", termion::cursor::Goto(c, height - 1))
-        }
-        print!("{}", termion::color::Bg(termion::color::Reset));
-
-        print!("{}", termion::color::Bg(termion::color::White));
-        for c in (4 + progress_current)..(progress_max+4) {
-            print!("{} ", termion::cursor::Goto(c, height - 1))
-        }
-
-        println!("{}", termion::color::Bg(termion::color::Reset));
+        draw(duration, remaining, width, height);
 
         if remaining.num_seconds() > 120 { 
             // Update less frequently if we have a ways to go.
@@ -153,7 +74,125 @@ fn main() {
     println!("{}", termion::cursor::Show);
     println!("{}", termion::color::Fg(termion::color::Reset));
     println!("{}", termion::style::Reset);
-    
-    
+}
 
+fn draw_all(start:DateTime<Local>, end:DateTime<Local>, duration:chrono::Duration, task: Option<&str>, width: u16, height: u16) {
+    
+    println!("{}", termion::clear::All);
+    
+    // Print Task
+    if task.is_some() {
+        let task_str = &task.unwrap();
+        println!("{}{}{}{}{}{}", 
+            termion::style::Bold,
+            termion::color::Fg(termion::color::LightRed),
+            termion::cursor::Goto((width / 2) - (task_str.len() / 2) as u16, height / 2), 
+            &task.unwrap(),
+            termion::color::Fg(termion::color::Reset),
+            termion::style::Reset);
+    }
+    
+    // Print Start
+    println!("{}{}Start: {}{}", 
+        termion::cursor::Goto(4, 2),
+        termion::color::Fg(termion::color::Reset),
+        termion::color::Fg(termion::color::LightBlue),
+        start.format("%l:%M"),
+        );
+
+    // Print Duration
+    let duration_str_for_size = format!("Duration: {}m", duration.num_minutes());
+    let duration_str = format!(
+        "{}Duration: {}{}m",
+        termion::color::Fg(termion::color::Reset),
+        termion::color::Fg(termion::color::LightBlue),
+        duration.num_minutes()
+        );
+        
+    println!("{}{}", 
+        termion::cursor::Goto((width / 2) - (duration_str_for_size.len() / 2) as u16, 2),
+        duration_str);
+
+    // Print End
+    let end_str = format!(
+        "{}End: {}{}",
+        termion::color::Fg(termion::color::Reset),
+        termion::color::Fg(termion::color::LightBlue),
+        end.format("%l:%M")
+        );
+    
+    println!("{}{}", 
+        termion::cursor::Goto(width - 9 - 4 as u16, 2),
+        end_str);
+    
+    println!("{}", termion::cursor::Hide);
+}
+
+/**
+ * TODO Take the clearing out, something else should be responsible.
+ */
+fn write_duration(dur: chrono::Duration, writer: &mut std::io::Write) {
+    return if dur.num_seconds() > 60 {
+        write!(writer, "{}m  ", dur.num_minutes() + 1).unwrap();
+    } else {
+        write!(writer, "{}s  ", dur.num_seconds()).unwrap();
+    }
+}
+
+
+#[cfg(test)]
+#[test]
+fn duration_str_tests() {
+    let make_str = |dur| {
+        let mut buf:Vec<u8> = Vec::new();
+        write_duration(dur, &mut buf);
+
+        String::from_utf8(buf).unwrap()
+    };
+
+    assert_eq!("0s  ", make_str(Duration::zero()));
+    assert_eq!("3s  ", make_str(Duration::seconds(3)));
+    assert_eq!("60s  ", make_str(Duration::seconds(60)));
+    assert_eq!("2m  ", make_str(Duration::seconds(61)));
+}
+
+fn num_bar_fill(remaining:chrono::Duration, _duration:chrono::Duration, bar_size:u16) -> u16 {
+    let percent = 1.0 - (remaining.num_seconds() as f64 / _duration.num_seconds() as f64);
+    let progress = (percent * f64::from(bar_size)) as u16;
+
+    progress
+}
+
+
+#[cfg(test)]
+#[test]
+fn num_bar_fill_tests() {
+    assert_eq!(40, num_bar_fill(Duration::seconds(30), Duration::seconds(60), 80));    
+}
+
+fn draw(duration:chrono::Duration, remaining: chrono::Duration, width: u16, height: u16) {
+    print!("{}{}Remaining: {}", 
+        termion::cursor::Goto(4, height - 3),
+        termion::color::Fg(termion::color::Reset),
+        termion::color::Fg(termion::color::LightBlue));
+    write_duration(remaining, &mut std::io::stdout().lock());
+
+    //    duration_str(remaining));
+
+    let bar_size = width - 4 - 4;
+    let progress_current = num_bar_fill(remaining, duration, width);
+
+     // TODO pull out the string / percent 
+    print!("{}", termion::color::Bg(termion::color::Blue));
+    for c in 4..(4+progress_current) {
+        print!("{} ", termion::cursor::Goto(c, height - 1))
+    }
+    print!("{}", termion::color::Bg(termion::color::Reset));
+
+    print!("{}", termion::color::Bg(termion::color::White));
+    for c in (4 + progress_current)..(bar_size+4) {
+        print!("{} ", termion::cursor::Goto(c, height - 1))
+    }
+
+    println!("{}", termion::color::Bg(termion::color::Reset));
 }
