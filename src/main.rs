@@ -17,6 +17,23 @@ use std::sync::atomic::Ordering;
 use std::thread;
 use std::thread::park_timeout;
 
+#[derive(Clone)]
+struct State<'a> {
+    width: u16,
+    height: u16,
+    start: DateTime<Local>,
+    end: DateTime<Local>,
+    task: Option<&'a str>,
+    duration: Duration,
+    remaining: Duration
+}
+
+enum Event {
+    WindowSizeChange(u16, u16),
+    CtrlC,
+    Timeout(DateTime<Local>)
+}
+
 fn main() {
     let matches = App::new("Romodoro")
                         .version("0.4")
@@ -38,31 +55,42 @@ fn main() {
         current_thread.unpark();
     }).unwrap();
 
-    let start = Local::now();
-    let duration = Duration::seconds(60 * 25);
-    let end = start + duration;    
-
-    let task = matches.value_of("task");
 
     let mut last_width = 0;
     let mut last_height = 0;
 
+    let (width, height) = termion::terminal_size().unwrap_or((80, 24));
+
+    let start = Local::now();
+    let duration = Duration::seconds(60 * 25);
+
+    let mut state = State {
+            start: start,
+            end: start + duration,
+            task: matches.value_of("task"),
+            duration: duration,
+            width: width,
+            height: height,
+            remaining: (start + duration) - start
+        };
+        
     // Update the screen.
-    while Local::now() < end && keep_running.load(Ordering::SeqCst) {
+    while Local::now() < state.end && keep_running.load(Ordering::SeqCst) {
         let (width, height) = termion::terminal_size().unwrap_or((80, 24));
 
-        let remaining = end - Local::now();
-
         if width != last_width || height != last_height {
+            handle_event(Event::WindowSizeChange(width, height), &mut state);
             last_width = width;
             last_height = height;
-
-            draw_all(start, end, duration, task, width, height);
         }
 
-        draw(duration, remaining, width, height);
+        handle_event(Event::Timeout(Local::now()), &mut state);
+        
+        if !keep_running.load(Ordering::SeqCst) {
+            handle_event(Event::CtrlC, &mut state);
+        }
 
-        if remaining.num_seconds() > 120 { 
+        if state.remaining.num_seconds() > 120 { 
             // Update less frequently if we have a ways to go.
             park_timeout(std::time::Duration::from_secs(10));
         } else {
@@ -70,24 +98,51 @@ fn main() {
         }
     }
 
+}
+
+fn draw_screen_reset() {
     // Revert the cursor, colours and style.
     println!("{}", termion::cursor::Show);
     println!("{}", termion::color::Fg(termion::color::Reset));
     println!("{}", termion::style::Reset);
 }
 
-fn draw_all(start:DateTime<Local>, end:DateTime<Local>, duration:chrono::Duration, task: Option<&str>, width: u16, height: u16) {
+fn handle_event(event: Event, state:&mut State) {
+    match event {
+        Event::WindowSizeChange(w, h) => {
+            state.width = w;
+            state.height = h;
+
+            draw_all(state);
+        },
+        Event::CtrlC => { 
+            draw_screen_reset();
+            std::process::exit(0);
+        },
+        Event::Timeout(now) => {
+            if now > state.end {
+                draw_screen_reset();
+                std::process::exit(0);
+            } 
+            state.remaining = state.end - now;
+        }
+    };
+
+    draw_changes(state);
+}
+
+fn draw_all(state:&State) {
     
     println!("{}", termion::clear::All);
     
     // Print Task
-    if task.is_some() {
-        let task_str = &task.unwrap();
+    if state.task.is_some() {
+        let task_str = &state.task.unwrap();
         println!("{}{}{}{}{}{}", 
             termion::style::Bold,
             termion::color::Fg(termion::color::LightRed),
-            termion::cursor::Goto((width / 2) - (task_str.len() / 2) as u16, height / 2), 
-            &task.unwrap(),
+            termion::cursor::Goto((state.width / 2) - (task_str.len() / 2) as u16, state.height / 2), 
+            &state.task.unwrap(),
             termion::color::Fg(termion::color::Reset),
             termion::style::Reset);
     }
@@ -97,20 +152,20 @@ fn draw_all(start:DateTime<Local>, end:DateTime<Local>, duration:chrono::Duratio
         termion::cursor::Goto(4, 2),
         termion::color::Fg(termion::color::Reset),
         termion::color::Fg(termion::color::LightBlue),
-        start.format("%l:%M"),
+        state.start.format("%l:%M"),
         );
 
     // Print Duration
-    let duration_str_for_size = format!("Duration: {}m", duration.num_minutes());
+    let duration_str_for_size = format!("Duration: {}m", state.duration.num_minutes());
     let duration_str = format!(
         "{}Duration: {}{}m",
         termion::color::Fg(termion::color::Reset),
         termion::color::Fg(termion::color::LightBlue),
-        duration.num_minutes()
+        state.duration.num_minutes()
         );
         
     println!("{}{}", 
-        termion::cursor::Goto((width / 2) - (duration_str_for_size.len() / 2) as u16, 2),
+        termion::cursor::Goto((state.width / 2) - (duration_str_for_size.len() / 2) as u16, 2),
         duration_str);
 
     // Print End
@@ -118,11 +173,11 @@ fn draw_all(start:DateTime<Local>, end:DateTime<Local>, duration:chrono::Duratio
         "{}End: {}{}",
         termion::color::Fg(termion::color::Reset),
         termion::color::Fg(termion::color::LightBlue),
-        end.format("%l:%M")
+        state.end.format("%l:%M")
         );
     
     println!("{}{}", 
-        termion::cursor::Goto(width - 9 - 4 as u16, 2),
+        termion::cursor::Goto(state.width - 9 - 4 as u16, 2),
         end_str);
     
     println!("{}", termion::cursor::Hide);
@@ -170,28 +225,28 @@ fn num_bar_fill_tests() {
     assert_eq!(40, num_bar_fill(Duration::seconds(30), Duration::seconds(60), 80));    
 }
 
-fn draw(duration:chrono::Duration, remaining: chrono::Duration, width: u16, height: u16) {
+fn draw_changes(state: &State) {
     print!("{}{}Remaining: {}", 
-        termion::cursor::Goto(4, height - 3),
+        termion::cursor::Goto(4, state.height - 3),
         termion::color::Fg(termion::color::Reset),
         termion::color::Fg(termion::color::LightBlue));
-    write_duration(remaining, &mut std::io::stdout().lock());
+    write_duration(state.remaining, &mut std::io::stdout().lock());
 
     //    duration_str(remaining));
 
-    let bar_size = width - 4 - 4;
-    let progress_current = num_bar_fill(remaining, duration, width);
+    let bar_size = state.width - 4 - 4;
+    let progress_current = num_bar_fill(state.remaining, state.duration, state.width);
 
      // TODO pull out the string / percent 
     print!("{}", termion::color::Bg(termion::color::Blue));
     for c in 4..(4+progress_current) {
-        print!("{} ", termion::cursor::Goto(c, height - 1))
+        print!("{} ", termion::cursor::Goto(c, state.height - 1))
     }
     print!("{}", termion::color::Bg(termion::color::Reset));
 
     print!("{}", termion::color::Bg(termion::color::White));
     for c in (4 + progress_current)..(bar_size+4) {
-        print!("{} ", termion::cursor::Goto(c, height - 1))
+        print!("{} ", termion::cursor::Goto(c, state.height - 1))
     }
 
     println!("{}", termion::color::Bg(termion::color::Reset));
