@@ -115,12 +115,12 @@ fn initialize_state<'a>(width:u16, height:u16, task:Option<&'a str>, duration:Op
     };
 
     Ok(State {
-        start: start,
+        start,
         end: start + dur,
-        task: task,
+        task,
         duration: dur,
-        width: width,
-        height: height,
+        width,
+        height,
         remaining: (start + dur) - start
     })
 }
@@ -141,7 +141,7 @@ fn draw_screen_reset() {
     println!("{}", termion::cursor::Show);
     println!("{}", termion::color::Fg(termion::color::Reset));
     println!("{}", termion::style::Reset);
-}
+} 
 
 fn handle_event(event: Event, state:&mut State) {
     match event {
@@ -222,8 +222,8 @@ fn draw_all(state:&State) {
 /**
  * TODO Take the clearing out, something else should be responsible.
  */
-fn write_duration(dur: chrono::Duration, writer: &mut std::io::Write) {
-    return if dur.num_seconds() > 60 {
+fn write_duration(dur: chrono::Duration, writer: &mut dyn std::io::Write) {
+    if dur.num_seconds() > 60 {
         write!(writer, "{}m  ", dur.num_minutes() + 1).unwrap();
     } else {
         write!(writer, "{}s  ", dur.num_seconds()).unwrap();
@@ -249,9 +249,8 @@ fn duration_str_tests() {
 
 fn num_bar_fill(remaining:chrono::Duration, _duration:chrono::Duration, bar_size:u16) -> u16 {
     let percent = 1.0 - (remaining.num_seconds() as f64 / _duration.num_seconds() as f64);
-    let progress = (percent * f64::from(bar_size)) as u16;
-
-    progress
+    
+    (percent * f64::from(bar_size)) as u16
 }
 
 
