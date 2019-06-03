@@ -1,6 +1,6 @@
 [package]
 name = "romodoro"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Michael Fletcher <m.fletcher@theplanet.ca>"]
 edition = "2018"
 description = "Romodoro is a terminal Pomodoro timer."
