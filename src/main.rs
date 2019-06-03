@@ -17,7 +17,7 @@ use std::sync::atomic::Ordering;
 use std::thread;
 use std::thread::park_timeout;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct State<'a> {
     width: u16,
     height: u16,
@@ -43,6 +43,10 @@ fn main() {
                                .long("task")
                                .help("Display the specified task on the timer.  This will help keep you focused.")
                                .takes_value(true))
+                        .arg(Arg::with_name("duration")
+                               .long("duration")
+                               .help("Specify the duration of the pomodoro.  Defaults to 25m.")
+                               .takes_value(true))
                         .get_matches();
 
     // Setup a CTRL-C handler so we can cleanly close.  This is basically ensuring we reset the colours and cursor.
@@ -61,18 +65,14 @@ fn main() {
 
     let (width, height) = termion::terminal_size().unwrap_or((80, 24));
 
-    let start = Local::now();
-    let duration = Duration::seconds(60 * 25);
+    let mut state = match initialize_state(width, height, matches.value_of("task"), matches.value_of("duration")) {
+        Ok(x) => x,
+        Err(error_msg) => {
+            println!("{}", error_msg);
 
-    let mut state = State {
-            start: start,
-            end: start + duration,
-            task: matches.value_of("task"),
-            duration: duration,
-            width: width,
-            height: height,
-            remaining: (start + duration) - start
-        };
+            return;
+        }
+    };
         
     // Update the screen.
     while Local::now() < state.end && keep_running.load(Ordering::SeqCst) {
@@ -98,6 +98,42 @@ fn main() {
         }
     }
 
+}
+
+fn initialize_state<'a>(width:u16, height:u16, task:Option<&'a str>, duration:Option<&'a str>) -> Result<State<'a>, String> {
+    let start = Local::now();
+    let dur = match duration {
+        Some(duration_str) => {
+            let human_duration = humantime::parse_duration(duration_str);
+            if human_duration.is_err() {
+                return Err(format!("'{}' is not a valid duration.", duration_str));
+            }
+
+            Duration::from_std(human_duration.unwrap()).unwrap()
+        },
+        None => Duration::seconds(60 * 25)
+    };
+
+    Ok(State {
+        start: start,
+        end: start + dur,
+        task: task,
+        duration: dur,
+        width: width,
+        height: height,
+        remaining: (start + dur) - start
+    })
+}
+
+#[cfg(test)]
+#[test]
+fn initialize_state_tests() {
+    let state = initialize_state(20, 80, None, Some("15m"));
+    assert_eq!(true, state.is_ok());
+
+    let state = initialize_state(20, 80, None, Some("15"));
+    assert_eq!(false, state.is_ok());
+    assert_eq!("'15' is not a valid duration.", state.unwrap_err());
 }
 
 fn draw_screen_reset() {
